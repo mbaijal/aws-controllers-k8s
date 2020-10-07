@@ -11,7 +11,7 @@ investigated a number of options:
 
 - home-grown custom code generator
 - [kudo](https://kudo.dev)
-- [kubebuilder](github.com/kubernetes-sigs/kubebuilder)
+- [kubebuilder](https://github.com/kubernetes-sigs/kubebuilder)
 - a hybrid custom code generator + `sigs.kubernetes.io/controller-tools` (CR)
 
 The original AWS Service Operator used a [custom-built generator][1] that
