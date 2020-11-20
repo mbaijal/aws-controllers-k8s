@@ -1,0 +1,39 @@
+operations:
+  StopTrainingJob:
+    operation_type: Delete
+    resource_name: TrainingJob
+resources:
+  TrainingJob:
+    exceptions:
+      codes:
+        404: ValidationException
+ignore:
+    resource_names:
+      - Algorithm
+      - App
+      - AutoMLJob
+      - CodeRepository
+      - CompilationJob
+      - Domain
+      - EndpointConfig
+      - Endpoint
+      - Experiment
+      - FlowDefinition
+      - HumanTaskUi
+      - HyperParameterTuningJob
+      - LabelingJob
+      - ModelPackage
+      - MonitoringSchedule
+      - NotebookInstanceLifecycleConfig
+      - NotebookInstance
+      - PresignedDomainUrl
+      - PresignedNotebookInstanceUrl
+      - ProcessingJob
+      #- TrainingJob
+      - TransformJob
+      - TrialComponent
+      - Trial
+      - UserProfile
+      - Workforce
+      - Workteam
+      - Model
