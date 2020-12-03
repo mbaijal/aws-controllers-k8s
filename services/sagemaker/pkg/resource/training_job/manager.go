@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package model
+package training_job
 
 import (
 	"context"
@@ -33,8 +33,8 @@ import (
 	svcsdkapi "github.com/aws/aws-sdk-go/service/sagemaker/sagemakeriface"
 )
 
-// +kubebuilder:rbac:groups=sagemaker.services.k8s.aws,resources=models,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=sagemaker.services.k8s.aws,resources=models/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=sagemaker.services.k8s.aws,resources=trainingjobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=sagemaker.services.k8s.aws,resources=trainingjobs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
 
@@ -193,7 +193,7 @@ func (rm *resourceManager) onError(
 ) (acktypes.AWSResource, error) {
 	r1, updated := rm.updateConditions(r, err)
 	if !updated {
-		return r, err
+		return nil, err
 	}
 	for _, condition := range r1.Conditions() {
 		if condition.Type == ackv1alpha1.ConditionTypeTerminal &&

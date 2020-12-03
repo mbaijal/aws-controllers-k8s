@@ -28,6 +28,7 @@ setup_sagemaker_model_test_inputs() {
   XGBOOST_MODEL_NAME=`echo $XGBOOST_MODEL_NAME|cut -c1-64`
 }
 
+$ TODO: Fix the image registry 
 # Returns a Model Spec based on XGBOOST_MODEL_NAME, SAGEMAKER_DATA_BUCKET, AWS_REGION
 get_xgboost_model_yaml() {
   cat <<EOF
@@ -40,7 +41,7 @@ spec:
   primaryContainer:
     containerHostname: xgboost
     modelDataURL: s3://$SAGEMAKER_DATA_BUCKET/sagemaker/model/xgboost-mnist-model.tar.gz
-    image: $(get_xgboost_registry $AWS_REGION).dkr.ecr.$AWS_REGION.amazonaws.com/xgboost:latest
+    image: 433757028032.dkr.ecr.$AWS_REGION.amazonaws.com/xgboost:latest
   executionRoleARN: $SAGEMAKER_EXECUTION_ROLE_ARN
   tags:
     - key: key

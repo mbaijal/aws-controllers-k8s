@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package model
+package training_job
 
 import (
 	ackv1alpha1 "github.com/aws/aws-controllers-k8s/apis/core/v1alpha1"
@@ -29,7 +29,7 @@ import (
 // interface
 type resource struct {
 	// The Kubernetes-native CR representing the resource
-	ko *svcapitypes.Model
+	ko *svcapitypes.TrainingJob
 }
 
 // Identifiers returns an AWSResourceIdentifiers object containing various

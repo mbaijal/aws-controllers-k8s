@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package model
+package training_job
 
 import (
 	ackcompare "github.com/aws/aws-controllers-k8s/pkg/compare"
@@ -29,13 +29,13 @@ import (
 )
 
 const (
-	finalizerString = "finalizers.sagemaker.services.k8s.aws/Model"
+	finalizerString = "finalizers.sagemaker.services.k8s.aws/TrainingJob"
 )
 
 var (
 	resourceGK = metav1.GroupKind{
 		Group: "sagemaker.services.k8s.aws",
-		Kind:  "Model",
+		Kind:  "TrainingJob",
 	}
 )
 
@@ -53,7 +53,7 @@ func (d *resourceDescriptor) GroupKind() *metav1.GroupKind {
 // EmptyRuntimeObject returns an empty object prototype that may be used in
 // apimachinery and k8s client operations
 func (d *resourceDescriptor) EmptyRuntimeObject() k8sapirt.Object {
-	return &svcapitypes.Model{}
+	return &svcapitypes.TrainingJob{}
 }
 
 // ResourceFromRuntimeObject returns an AWSResource that has been initialized
@@ -62,7 +62,7 @@ func (d *resourceDescriptor) ResourceFromRuntimeObject(
 	obj k8sapirt.Object,
 ) acktypes.AWSResource {
 	return &resource{
-		ko: obj.(*svcapitypes.Model),
+		ko: obj.(*svcapitypes.TrainingJob),
 	}
 }
 
@@ -93,7 +93,7 @@ func (d *resourceDescriptor) Diff(
 	var diffReporter ackcompare.Reporter
 	opts := []cmp.Option{
 		cmp.Reporter(&diffReporter),
-		cmp.AllowUnexported(svcapitypes.Model{}),
+		cmp.AllowUnexported(svcapitypes.TrainingJob{}),
 	}
 	cmp.Equal(ac.ko, bc.ko, opts...)
 	return &diffReporter

@@ -15,6 +15,15 @@ source "$SCRIPTS_DIR/lib/aws/sagemaker.sh"
 
 sagemaker_setup_common_test_resources
 
+# Test TrainingJob
+# TODO: A cleaner way to do this
+THIS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+source "$THIS_DIR/helper/trainingjob/xgboost-train.sh"
+sagemaker_trainingjob_prechecks
+sagemaker_test_create_trainingjob
+sagemaker_test_delete_trainingjob
+sagemaker_trainingjob_postchecks
+
 # Test Model
 THIS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 source "$THIS_DIR/helper/model/xgboost-model.sh"
