@@ -7,6 +7,7 @@ operations:
     resource_name: ProcessingJob
 resources:
   Model:
+    is_requeue_required: false
     update_operation:
       custom_method_name: customUpdateModel
     exceptions:
@@ -42,6 +43,7 @@ resources:
           operation: DescribeTrainingJob
           path: FailureReason 
   ProcessingJob:
+    is_requeue_required: true
     update_operation:
       custom_method_name: customUpdateProcessingJob
     exceptions:

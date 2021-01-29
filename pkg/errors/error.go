@@ -42,6 +42,11 @@ var (
 	// Terminal is returned with resource is in Terminal Condition
 	Terminal = fmt.Errorf(
 		"resource is in terminal condition")
+	// PeriodicRequeueNoError is to indicate the error isn't an error
+	// but just a marker that the requeue will be performed again
+	// after some time.
+	PeriodicRequeue = fmt.Errorf(
+		"Periodic Requeue, reconcile after some time")
 )
 
 // AWSError returns the type conversion for the supplied error to an aws-sdk-go

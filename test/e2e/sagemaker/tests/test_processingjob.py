@@ -53,11 +53,11 @@ def kmeans_processing_job():
 
     yield (reference, resource)
 
-    # Delete the k8s resource if not already deleted by tests
-    try:
-        k8s.delete_custom_resource(reference)
-    except:
-        pass
+    # # Delete the k8s resource if not already deleted by tests
+    # try:
+    #     k8s.delete_custom_resource(reference)
+    # except:
+    #     pass
 
 
 @service_marker
@@ -117,19 +117,19 @@ class TestProcessingJob:
         assert current_processing_job_status in expected_processing_job_status_list
         
 
-    def test_processing_job_has_stopped_status(self, sagemaker_client, kmeans_processing_job):
-        (reference, _) = kmeans_processing_job
-        resource = k8s.get_resource(reference)
-        processing_job_name = resource['spec'].get('processingJobName', None)
+    # def test_processing_job_has_stopped_status(self, sagemaker_client, kmeans_processing_job):
+    #     (reference, _) = kmeans_processing_job
+    #     resource = k8s.get_resource(reference)
+    #     processing_job_name = resource['spec'].get('processingJobName', None)
 
-        assert processing_job_name is not None
+    #     assert processing_job_name is not None
 
-        # Delete the k8s resource.
-        k8s.delete_custom_resource(reference)
-        # TODO: This sleep could be replaced by a wait loop but this is sufficient for now.
-        time.sleep(5)
+    #     # Delete the k8s resource.
+    #     k8s.delete_custom_resource(reference)
+    #     # TODO: This sleep could be replaced by a wait loop but this is sufficient for now.
+    #     time.sleep(5)
         
-        current_processing_job_status = self._get_sagemaker_processing_job_status(
-            sagemaker_client, processing_job_name)
-        expected_processing_job_status_list = self._get_stopped_processing_job_status_list()
-        assert current_processing_job_status in expected_processing_job_status_list
+    #     current_processing_job_status = self._get_sagemaker_processing_job_status(
+    #         sagemaker_client, processing_job_name)
+    #     expected_processing_job_status_list = self._get_stopped_processing_job_status_list()
+    #     assert current_processing_job_status in expected_processing_job_status_list

@@ -69,6 +69,8 @@ type ResourceConfig struct {
 	// All ShortNames must be distinct from any other ShortNames installed into the cluster,
 	// otherwise the CRD will fail to install.
 	ShortNames []string `json:"shortNames,omitempty"`
+	// IsRequeueRequired determines whether the CR should be requeued periodically
+	IsRequeueRequired bool `json:"is_requeue_required"`
 }
 
 // CompareConfig informs instruct the code generator on how to compare two different
@@ -307,6 +309,22 @@ func (c *Config) IsIgnoredResource(resourceName string) bool {
 		return false
 	}
 	return util.InStrings(resourceName, c.Ignore.ResourceNames)
+}
+
+// IsResourceRequeueRequired returns true if the Resource is configured to be requeued
+// in generator config for the AWS service
+func (c *Config) IsResourceRequeueRequired(resourceName string) bool {
+	if resourceName == "" {
+		return false
+	}
+	if c == nil {
+		return false
+	}
+	rConfig, ok := c.Resources[resourceName]
+	if !ok {
+		return false
+	}
+	return rConfig.IsRequeueRequired
 }
 
 // ResourceInputFieldRename returns the renamed field for a Resource, a

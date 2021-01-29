@@ -235,6 +235,26 @@ func (r *reconciler) sync(
 				ackerr.TemporaryOutOfSync, requeue.DefaultRequeueAfterDuration)
 		}
 	}
+
+	log.V(0).Info(
+		"Meghna: Log before check.",
+		"arn", latest.Identifiers().ARN(),
+	)
+	
+	resourceKind := desired.RuntimeObject().GetObjectKind().GroupVersionKind().Kind
+	requeueFlag := requeue.IsResourceRequeueRequired(resourceKind)
+
+	log.V(1).Info(
+		"Meghna: Will it requeue ?",
+		"resourceKind", resourceKind,
+		"requeueFlag", requeueFlag,
+	)
+	
+	if requeueFlag {
+		return requeue.NeededAfter(
+			ackerr.PeriodicRequeue, requeue.DefaultRequeueAfterDuration)
+	}
+	
 	return nil
 }
 

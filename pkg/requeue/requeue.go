@@ -29,6 +29,11 @@ func Needed(err error) *RequeueNeeded {
 	}
 }
 
+// IsResourceRequeueRequired returns a bool based on the config file
+func IsResourceRequeueRequired(resourceName string) bool {
+	return IsResourceRequeueRequired(resourceName)
+}
+
 // NeededAfter returns a new RequeueNeededAfter to instruct controller-runtime
 // to requeue the processing item after specified duration without been logged
 // as error.
