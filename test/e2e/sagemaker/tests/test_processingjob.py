@@ -27,7 +27,8 @@ from common import k8s
 RESOURCE_PLURAL = "processingjobs"
 PROCESSING_JOB_STATUS_CREATED = ("InProgress", "Completed")
 PROCESSING_JOB_STATUS_STOPPED = ("Stopped", "Stopping")
-
+PROCESSING_JOB_STATUS_INPROGRESS = "InProgress"
+PROCESSING_JOB_STATUS_SUCCESSFUL = "Completed"
 
 def _sagemaker_client():
     return boto3.client("sagemaker")
@@ -50,7 +51,7 @@ def _make_processing_job():
 
     return reference, data
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def kmeans_processing_job():
     (processing_job, data) = _make_processing_job()
     resource = k8s.create_custom_resource(processing_job, data)
@@ -76,6 +77,57 @@ def get_sagemaker_processing_job(processing_job_name: str):
 @service_marker
 @pytest.mark.canary
 class TestProcessingJob:
+    def _wait_resource_processing_status(
+        self,
+        reference: k8s.CustomResourceReference,
+        expected_status: str,
+        wait_periods: int = 30,
+    ):
+        resource_status = None
+        for _ in range(wait_periods):
+            time.sleep(30)
+            resource = k8s.get_resource(reference)
+            resource_status = resource["status"]["processingJobStatus"]
+            if resource_status == expected_status:
+                break
+        else:
+            logging.error(
+                f"Wait for ProcessingJobStatus: {expected_status} timed out. Actual status: {resource_status}"
+            )
+
+        return resource_status
+
+    def _wait_sagemaker_processing_status(
+        self,
+        processing_job_name,
+        expected_status: str,
+        wait_periods: int = 30,
+    ):
+        actual_status = None
+        for _ in range(wait_periods):
+            time.sleep(30)
+            processing_sm_desc = get_sagemaker_processing_job(processing_job_name)
+            actual_status = processing_sm_desc["ProcessingJobStatus"]
+            if actual_status == expected_status:
+                break
+        else:
+            logging.error(
+                f"Wait for sagemaker processing status: {expected_status} timed out. Actual status: {actual_status}"
+            )
+
+        return actual_status
+
+    def _assert_processing_status_in_sync(
+        self, processing_job_name, reference, expected_status
+    ):
+        assert (
+            self._wait_sagemaker_processing_status(
+                processing_job_name, expected_status
+            )
+            == self._wait_resource_processing_status(reference, expected_status)
+            == expected_status
+        )
+
     def test_processing_job(self, kmeans_processing_job):
         (reference, resource) = kmeans_processing_job
         assert k8s.get_resource_exists(reference)
@@ -88,9 +140,34 @@ class TestProcessingJob:
         assert k8s.get_resource_arn(resource) == processing_job_desc["ProcessingJobArn"]
         assert processing_job_desc["ProcessingJobStatus"] in PROCESSING_JOB_STATUS_CREATED
 
+        self._assert_processing_status_in_sync(
+            processing_job_name, reference, PROCESSING_JOB_STATUS_INPROGRESS
+        )
+
         # Delete the k8s resource.
         _, deleted = k8s.delete_custom_resource(reference)
         assert deleted is True
 
         processing_job_desc = get_sagemaker_processing_job(processing_job_name)
         assert processing_job_desc["ProcessingJobStatus"] in PROCESSING_JOB_STATUS_STOPPED
+
+    def test_completed_processing_job(self, kmeans_processing_job):
+        (reference, resource) = kmeans_processing_job
+        assert k8s.get_resource_exists(reference)
+
+        processing_job_name = resource["spec"].get("processingJobName", None)
+        assert processing_job_name is not None
+
+        processing_job_desc = get_sagemaker_processing_job(processing_job_name)
+
+        assert k8s.get_resource_arn(resource) == processing_job_desc["ProcessingJobArn"]
+        assert processing_job_desc["ProcessingJobStatus"] in PROCESSING_JOB_STATUS_CREATED
+
+        self._assert_processing_status_in_sync(
+            processing_job_name, reference, PROCESSING_JOB_STATUS_SUCCESSFUL
+        )
+
+        # Check that you can delete a completed resource from k8s
+        # TODO: uncomment after fix is merged
+        # _, deleted = k8s.delete_custom_resource(reference)
+        # assert deleted is True

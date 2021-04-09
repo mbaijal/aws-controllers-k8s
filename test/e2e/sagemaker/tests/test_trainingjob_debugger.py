@@ -10,7 +10,7 @@
 # on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
 # express or implied. See the License for the specific language governing
 # permissions and limitations under the License.
-"""Integration tests for the SageMaker TrainingJob API with the Debugger Feature.
+"""Integration tests for the SageMaker TrainingJob API.
 """
 
 import boto3
@@ -25,168 +25,221 @@ from common.resources import load_resource_file, random_suffix_name
 from common import k8s
 
 RESOURCE_PLURAL = "trainingjobs"
+TRAINING_JOB_STATUS_CREATED = ("InProgress", "Completed")
+TRAINING_JOB_STATUS_STOPPED = ("Stopped", "Stopping")
+TRAINING_JOB_STATUS_INPROGRESS = "InProgress"
+TRAINING_JOB_STATUS_SUCCESSFUL = "Completed"
 
-
-@pytest.fixture(scope="module")
-def sagemaker_client():
+def _sagemaker_client():
     return boto3.client("sagemaker")
 
-
-@pytest.fixture(scope="module")
-def xgboost_trainingjob_debugger():
+def _make_training_debugger_job():
     resource_name = random_suffix_name("xgboost-trainingjob-debugger", 32)
 
     replacements = REPLACEMENT_VALUES.copy()
     replacements["TRAINING_JOB_NAME"] = resource_name
 
-    trainingjob = load_resource_file(
+    data = load_resource_file(
         SERVICE_NAME, "xgboost_trainingjob_debugger", additional_replacements=replacements
     )
-    logging.debug(trainingjob)
+    logging.debug(data)
 
     # Create the k8s resource
     reference = k8s.CustomResourceReference(
         CRD_GROUP, CRD_VERSION, RESOURCE_PLURAL, resource_name, namespace="default"
     )
-    resource = k8s.create_custom_resource(reference, trainingjob)
-    resource = k8s.wait_resource_consumed_by_controller(reference)
 
-    assert resource is not None
+    return reference, data
 
-    yield (reference, resource)
+@pytest.fixture(scope="function")
+def xgboost_training_job_debugger():
+    (training_job, data) = _make_training_debugger_job()
+    resource = k8s.create_custom_resource(training_job, data)
+    resource = k8s.wait_resource_consumed_by_controller(training_job)
 
-    # # Delete the k8s resource if not already deleted by tests
-    # try:
-    #     k8s.delete_custom_resource(reference)
-    # except:
-    #     pass
+    yield (training_job, resource) 
 
+    if k8s.get_resource_exists(training_job):
+        k8s.delete_custom_resource(training_job)
+
+def get_sagemaker_training_job(training_job_name: str):
+    try:
+        training_job = _sagemaker_client().describe_training_job(
+            TrainingJobName=training_job_name
+        )
+        return training_job
+    except BaseException:
+        logging.error(
+            f"SageMaker could not find a training debugger job with the name {training_job_name}"
+        )
+        return None
 
 @service_marker
 @pytest.mark.canary
-class TestTrainingJobDebugger:
-    def _get_created_trainingjob_status_list(self):
-        return ["InProgress", "Completed"]
+class TestTrainingDebuggerJob:
+    def _wait_resource_training_status(
+        self,
+        reference: k8s.CustomResourceReference,
+        expected_status: str,
+        wait_periods: int = 30,
+    ):
+        resource_status = None
+        for _ in range(wait_periods):
+            time.sleep(30)
+            resource = k8s.get_resource(reference)
+            resource_status = resource["status"]["trainingJobStatus"]
+            if resource_status == expected_status:
+                break
+        else:
+            logging.error(
+                f"Wait for TrainingJobStatus: {expected_status} timed out. Actual status: {resource_status}"
+            )
 
-    def _get_stopped_trainingjob_status_list(self):
-        return ["Stopped", "Stopping"]
+        return resource_status
 
-    def _get_created_trainingjob_debugger_status_list(self):
-        return ["InProgress", "NoIssuesFound"]
+    def _wait_sagemaker_training_status(
+        self,
+        training_job_name,
+        expected_status: str,
+        wait_periods: int = 30,
+    ):
+        actual_status = None
+        for _ in range(wait_periods):
+            time.sleep(30)
+            training_sm_desc = get_sagemaker_training_job(training_job_name)
+            actual_status = training_sm_desc["TrainingJobStatus"]
+            if actual_status == expected_status:
+                break
+        else:
+            logging.error(
+                f"Wait for sagemaker training status: {expected_status} timed out. Actual status: {actual_status}"
+            )
 
-    def _get_stopped_trainingjob_debugger_status_list(self):
-        return ["Stopped", "Stopping"]
+        return actual_status
 
-    def _get_resource_trainingjob_arn(self, resource: Dict):
+    def _assert_training_status_in_sync(
+        self, training_job_name, reference, expected_status
+    ):
         assert (
-            "ackResourceMetadata" in resource["status"]
-            and "arn" in resource["status"]["ackResourceMetadata"]
+            self._wait_sagemaker_training_status(
+                training_job_name, expected_status
+            )
+            == self._wait_resource_training_status(reference, expected_status)
+            == expected_status
         )
-        return resource["status"]["ackResourceMetadata"]["arn"]
 
-    def _get_sagemaker_trainingjob_arn(self, sagemaker_client, trainingjob_name: str):
-        try:
-            trainingjob = sagemaker_client.describe_training_job(
-                TrainingJobName=trainingjob_name
-            )
-            return trainingjob["TrainingJobArn"]
-        except BaseException:
-            logging.error(
-                f"SageMaker could not find a trainingJob with the name {trainingjob_name}"
-            )
-            return None
-
-    def _get_sagemaker_trainingjob_status(
-        self, sagemaker_client, trainingjob_name: str
+    def _wait_resource_training_debugger_status(
+        self,
+        reference: k8s.CustomResourceReference,
+        expected_status: str,
+        wait_periods: int = 30,
     ):
-        try:
-            trainingjob = sagemaker_client.describe_training_job(
-                TrainingJobName=trainingjob_name
-            )
-            return trainingjob["TrainingJobStatus"]
-        except BaseException:
+        resource_status = None
+        for _ in range(wait_periods):
+            time.sleep(30)
+            resource = k8s.get_resource(reference)
+            resource_status = resource["status"]["debugRuleEvaluationStatuses"][0]["ruleEvaluationStatus"]
+            if resource_status == expected_status:
+                break
+        else:
             logging.error(
-                f"SageMaker could not find a trainingJob with the name {trainingjob_name}"
+                f"Wait for TrainingJobStatus: {expected_status} timed out. Actual status: {resource_status}"
             )
-            return None
 
-    def _get_sagemaker_trainingjob_debugger_status(
-        self, sagemaker_client, trainingjob_name: str
+        return resource_status
+
+    def _wait_sagemaker_training_debugger_status(
+        self,
+        training_job_name,
+        expected_status: str,
+        wait_periods: int = 30,
     ):
-        try:
-            trainingjob = sagemaker_client.describe_training_job(
-                TrainingJobName=trainingjob_name
-            )
-            return trainingjob["DebugRuleEvaluationStatuses"][0]["RuleEvaluationStatus"]
-        except BaseException:
+        actual_status = None
+        for _ in range(wait_periods):
+            time.sleep(30)
+            training_sm_desc = get_sagemaker_training_job(training_job_name)
+            actual_status = training_sm_desc["DebugRuleEvaluationStatuses"][0]["RuleEvaluationStatus"]
+            if actual_status == expected_status:
+                break
+        else:
             logging.error(
-                f"SageMaker could not find a debugger trainingJob with the name {trainingjob_name}"
+                f"Wait for sagemaker training debugger status: {expected_status} timed out. Actual status: {actual_status}"
             )
-            return None
 
-    def test_create_trainingjob_debugger(self, xgboost_trainingjob_debugger):
-        (reference, resource) = xgboost_trainingjob_debugger
+        return actual_status
+
+    def _assert_training_debugger_status_in_sync(
+        self, training_job_name, reference, expected_status
+    ):
+        assert (
+            self._wait_sagemaker_training_status(
+                training_job_name, expected_status
+            )
+            == self._wait_resource_training_status(reference, expected_status)
+            == expected_status
+        )
+    
+    def test_training_job_debugger(self, xgboost_training_job_debugger):
+        (reference, resource) = xgboost_training_job_debugger
         assert k8s.get_resource_exists(reference)
 
-    def test_trainingjob_debugger_has_correct_arn(self, sagemaker_client, xgboost_trainingjob_debugger):
-        (reference, _) = xgboost_trainingjob_debugger
-        resource = k8s.get_resource(reference)
-        trainingjob_name = resource["spec"].get("trainingJobName", None)
+        training_job_name = resource["spec"].get("trainingJobName", None)
+        assert training_job_name is not None
 
-        assert trainingjob_name is not None
+        training_job_desc = get_sagemaker_training_job(training_job_name)
 
-        resource_trainingjob_arn = k8s.get_resource_arn(resource)
-        expected_trainingjob_arn = self._get_sagemaker_trainingjob_arn(
-            sagemaker_client, trainingjob_name
+        assert k8s.get_resource_arn(resource) == training_job_desc["TrainingJobArn"]
+        assert training_job_desc["TrainingJobStatus"] in TRAINING_JOB_STATUS_CREATED
+
+        self._assert_training_status_in_sync(
+            training_job_name, reference, TRAINING_JOB_STATUS_INPROGRESS
         )
-
-        assert resource_trainingjob_arn == expected_trainingjob_arn
-
-    def test_trainingjob_debugger_has_created_status(
-        self, sagemaker_client, xgboost_trainingjob_debugger
-    ):
-        (reference, _) = xgboost_trainingjob_debugger
-        resource = k8s.get_resource(reference)
-        trainingjob_name = resource["spec"].get("trainingJobName", None)
-
-        assert trainingjob_name is not None
-
-        current_trainingjob_status = self._get_sagemaker_trainingjob_status(
-            sagemaker_client, trainingjob_name
-        )
-        expected_trainingjob_status_list = self._get_created_trainingjob_status_list()
-        assert current_trainingjob_status in expected_trainingjob_status_list
-
-    def test_trainingjob__debugger_has_debugger_status(
-        self, sagemaker_client, xgboost_trainingjob_debugger
-    ):
-        (reference, _) = xgboost_trainingjob_debugger
-        resource = k8s.get_resource(reference)
-        trainingjob_name = resource["spec"].get("trainingJobName", None)
-
-        assert trainingjob_name is not None
-
-        current_trainingjob_debugger_status = self._get_sagemaker_trainingjob_debugger_status(
-            sagemaker_client, trainingjob_name
-        )
-        expected_trainingjob_debugger_status_list = self._get_created_trainingjob_debugger_status_list()
-        assert current_trainingjob_debugger_status in expected_trainingjob_debugger_status_list
-
-    def test_trainingjob_debugger_has_stopped_status(
-        self, sagemaker_client, xgboost_trainingjob_debugger
-    ):
-        (reference, _) = xgboost_trainingjob_debugger
-        resource = k8s.get_resource(reference)
-        trainingjob_name = resource["spec"].get("trainingJobName", None)
-
-        assert trainingjob_name is not None
 
         # Delete the k8s resource.
         _, deleted = k8s.delete_custom_resource(reference)
         assert deleted is True
 
-        current_trainingjob_debugger_status = self._get_sagemaker_trainingjob_status(
-            sagemaker_client, trainingjob_name
+        training_job_desc = get_sagemaker_training_job(training_job_name)
+        assert training_job_desc["TrainingJobStatus"] in TRAINING_JOB_STATUS_STOPPED
+
+    def test_completed_training_job_debugger(self, xgboost_training_job_debugger):
+        (reference, resource) = xgboost_training_job_debugger
+        assert k8s.get_resource_exists(reference)
+
+        training_job_name = resource["spec"].get("trainingJobName", None)
+        assert training_job_name is not None
+
+        training_job_desc = get_sagemaker_training_job(training_job_name)
+
+        assert k8s.get_resource_arn(resource) == training_job_desc["TrainingJobArn"]
+        assert training_job_desc["TrainingJobStatus"] in TRAINING_JOB_STATUS_CREATED
+
+        self._assert_training_status_in_sync(
+            training_job_name, reference, TRAINING_JOB_STATUS_SUCCESSFUL
         )
-        expected_trainingjob_debugger_status_list = self._get_stopped_trainingjob_debugger_status_list()
-        assert current_trainingjob_debugger_status in expected_trainingjob_debugger_status_list
+
+        # Check that you can delete a completed resource from k8s
+        # TODO: uncomment after fix is merged
+        # _, deleted = k8s.delete_custom_resource(reference)
+        # assert deleted is True
+
+    # def test_completed_training_job_debugger_debugging(self, xgboost_training_job_debugger):
+    #     (reference, resource) = xgboost_training_job_debugger
+    #     assert k8s.get_resource_exists(reference)
+
+    #     training_job_name = resource["spec"].get("trainingJobName", None)
+    #     assert training_job_name is not None
+
+    #     training_job_desc = get_sagemaker_training_job(training_job_name)
+
+    #     assert k8s.get_resource_arn(resource) == training_job_desc["TrainingJobArn"]
+    #     assert training_job_desc["TrainingJobStatus"] in TRAINING_JOB_STATUS_CREATED
+
+    #     self._assert_training_status_in_sync(
+    #         training_job_name, reference, TRAINING_JOB_STATUS_SUCCESSFUL
+    #     )
+
+    #     # Check that you can delete a completed resource from k8s
+    #     # TODO: uncomment after fix is merged
+    #     # _, deleted = k8s.delete_custom_resource(reference)
+    #     # assert deleted is True
