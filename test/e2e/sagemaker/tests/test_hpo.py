@@ -22,10 +22,12 @@ from sagemaker import service_marker, create_sagemaker_resource
 from sagemaker.replacement_values import REPLACEMENT_VALUES
 from common.resources import random_suffix_name
 from common import k8s
+from time import sleep
 
 RESOURCE_PLURAL = "hyperparametertuningjobs"
 HPO_JOB_STATUS_CREATED = ("InProgress", "Completed")
 HPO_JOB_STATUS_STOPPED = ("Stopped", "Stopping")
+HPO_JOB_STATUS_SUCCESSFUL = ("Completed")
 
 
 def _sagemaker_client():
@@ -88,3 +90,21 @@ class TestHPO:
 
         hpo_sm_desc = get_sagemaker_hpo_job(hpo_job_name)
         assert hpo_sm_desc["HyperParameterTuningJobStatus"] in HPO_JOB_STATUS_STOPPED
+
+    def test_completed_hpo(self, xgboost_hpojob):
+        (reference, resource) = xgboost_hpojob
+        assert k8s.get_resource_exists(reference)
+
+        hpo_job_name = resource["spec"].get("hyperParameterTuningJobName", None)
+        assert hpo_job_name is not None
+
+        hpo_sm_desc = get_sagemaker_hpo_job(hpo_job_name)
+        assert (
+            k8s.get_resource_arn(resource) == hpo_sm_desc["HyperParameterTuningJobArn"]
+        )
+        assert hpo_sm_desc["HyperParameterTuningJobStatus"] in HPO_JOB_STATUS_CREATED
+
+        sleep(360)
+
+        hpo_sm_desc = get_sagemaker_hpo_job(hpo_job_name)
+        assert hpo_sm_desc["HyperParameterTuningJobStatus"] in HPO_JOB_STATUS_SUCCESSFUL

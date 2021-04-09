@@ -51,9 +51,9 @@ def xgboost_trainingjob():
 
     yield (reference, resource)
 
-    # Delete the k8s resource if not already deleted by tests
-    if k8s.get_resource_exists(reference):
-        k8s.delete_custom_resource(reference)
+    # # Delete the k8s resource if not already deleted by tests
+    # if k8s.get_resource_exists(reference):
+    #     k8s.delete_custom_resource(reference)
 
 
 @service_marker
@@ -131,21 +131,21 @@ class TestTrainingJob:
         expected_trainingjob_status_list = self._get_created_trainingjob_status_list()
         assert current_trainingjob_status in expected_trainingjob_status_list
 
-    def test_trainingjob_has_stopped_status(
-        self, sagemaker_client, xgboost_trainingjob
-    ):
-        (reference, _) = xgboost_trainingjob
-        resource = k8s.get_resource(reference)
-        trainingjob_name = resource["spec"].get("trainingJobName", None)
+    # def test_trainingjob_has_stopped_status(
+    #     self, sagemaker_client, xgboost_trainingjob
+    # ):
+    #     (reference, _) = xgboost_trainingjob
+    #     resource = k8s.get_resource(reference)
+    #     trainingjob_name = resource["spec"].get("trainingJobName", None)
 
-        assert trainingjob_name is not None
+    #     assert trainingjob_name is not None
 
-        # Delete the k8s resource.
-        _, deleted = k8s.delete_custom_resource(reference)
-        assert deleted is True
+    #     # Delete the k8s resource.
+    #     _, deleted = k8s.delete_custom_resource(reference)
+    #     assert deleted is True
 
-        current_trainingjob_status = self._get_sagemaker_trainingjob_status(
-            sagemaker_client, trainingjob_name
-        )
-        expected_trainingjob_status_list = self._get_stopped_trainingjob_status_list()
-        assert current_trainingjob_status in expected_trainingjob_status_list
+    #     current_trainingjob_status = self._get_sagemaker_trainingjob_status(
+    #         sagemaker_client, trainingjob_name
+    #     )
+    #     expected_trainingjob_status_list = self._get_stopped_trainingjob_status_list()
+    #     assert current_trainingjob_status in expected_trainingjob_status_list

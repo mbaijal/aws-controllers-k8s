@@ -172,21 +172,21 @@ class TestTrainingJobDebugger:
         expected_trainingjob_debugger_status_list = self._get_created_trainingjob_debugger_status_list()
         assert current_trainingjob_debugger_status in expected_trainingjob_debugger_status_list
 
-    def test_trainingjob_debugger_has_stopped_status(
-        self, sagemaker_client, xgboost_trainingjob_debugger
-    ):
-        (reference, _) = xgboost_trainingjob_debugger
-        resource = k8s.get_resource(reference)
-        trainingjob_name = resource["spec"].get("trainingJobName", None)
+    # def test_trainingjob_debugger_has_stopped_status(
+    #     self, sagemaker_client, xgboost_trainingjob_debugger
+    # ):
+    #     (reference, _) = xgboost_trainingjob_debugger
+    #     resource = k8s.get_resource(reference)
+    #     trainingjob_name = resource["spec"].get("trainingJobName", None)
 
-        assert trainingjob_name is not None
+    #     assert trainingjob_name is not None
 
-        # Delete the k8s resource.
-        _, deleted = k8s.delete_custom_resource(reference)
-        assert deleted is True
+    #     # Delete the k8s resource.
+    #     _, deleted = k8s.delete_custom_resource(reference)
+    #     assert deleted is True
 
-        current_trainingjob_debugger_status = self._get_sagemaker_trainingjob_status(
-            sagemaker_client, trainingjob_name
-        )
-        expected_trainingjob_debugger_status_list = self._get_stopped_trainingjob_debugger_status_list()
-        assert current_trainingjob_debugger_status in expected_trainingjob_debugger_status_list
+    #     current_trainingjob_debugger_status = self._get_sagemaker_trainingjob_status(
+    #         sagemaker_client, trainingjob_name
+    #     )
+    #     expected_trainingjob_debugger_status_list = self._get_stopped_trainingjob_debugger_status_list()
+    #     assert current_trainingjob_debugger_status in expected_trainingjob_debugger_status_list
