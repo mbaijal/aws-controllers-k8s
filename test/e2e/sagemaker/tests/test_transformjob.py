@@ -27,10 +27,10 @@ from common.aws import get_aws_region
 from sagemaker.bootstrap_resources import get_bootstrap_resources
 
 RESOURCE_PLURAL = 'transformjobs'
+TRANSFORM_JOB_STATUS_CREATED = ("InProgress")
+TRANSFORM_JOB_STATUS_STOPPED = ("Stopped", "Stopping", "Completed")
 
-
-@pytest.fixture(scope="module")
-def sagemaker_client():
+def _sagemaker_client():
     return boto3.client('sagemaker')
 
 
@@ -88,17 +88,12 @@ def xgboost_transformjob(sagemaker_client):
     except:
         pass
 
-
+def get_resource_transformjob():
+    
 
 @service_marker
 @pytest.mark.canary
 class TestTransformJob:
-    def _get_created_transformjob_status_list(self):
-        return ["InProgress"]
-    
-    def _get_stopped_transformjob_status_list(self):
-        return ["Stopped", "Stopping", "Completed"]
-
     def _get_resource_transformjob_arn(self, resource: Dict):
         assert 'ackResourceMetadata' in resource['status'] and \
             'arn' in resource['status']['ackResourceMetadata']

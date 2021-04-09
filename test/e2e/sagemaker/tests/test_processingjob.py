@@ -25,134 +25,72 @@ from common.resources import load_resource_file, random_suffix_name
 from common import k8s
 
 RESOURCE_PLURAL = "processingjobs"
+PROCESSING_JOB_STATUS_CREATED = ("InProgress", "Completed")
+PROCESSING_JOB_STATUS_STOPPED = ("Stopped", "Stopping")
 
 
-@pytest.fixture(scope="module")
-def sagemaker_client():
+def _sagemaker_client():
     return boto3.client("sagemaker")
 
-
-@pytest.fixture(scope="module")
-def kmeans_processing_job():
+def _make_processing_job():
     resource_name = random_suffix_name("kmeans-processingjob", 32)
 
     replacements = REPLACEMENT_VALUES.copy()
     replacements["PROCESSING_JOB_NAME"] = resource_name
 
-    processing_job = load_resource_file(
+    data = load_resource_file(
         SERVICE_NAME, "kmeans_processingjob", additional_replacements=replacements
     )
-    logging.debug(processing_job)
+    logging.debug(data)
 
     # Create the k8s resource
     reference = k8s.CustomResourceReference(
         CRD_GROUP, CRD_VERSION, RESOURCE_PLURAL, resource_name, namespace="default"
     )
-    resource = k8s.create_custom_resource(reference, processing_job)
-    resource = k8s.wait_resource_consumed_by_controller(reference)
 
-    assert resource is not None
+    return reference, data
 
-    yield (reference, resource)
+@pytest.fixture(scope="module")
+def kmeans_processing_job():
+    (processing_job, data) = _make_processing_job()
+    resource = k8s.create_custom_resource(processing_job, data)
+    resource = k8s.wait_resource_consumed_by_controller(processing_job)
 
-    # Delete the k8s resource if not already deleted by tests
+    yield (processing_job, resource) 
+
+    if k8s.get_resource_exists(processing_job):
+        k8s.delete_custom_resource(processing_job)
+
+def get_sagemaker_processing_job(processing_job_name: str):
     try:
-        k8s.delete_custom_resource(reference)
-    except:
-        pass
-
+        processing_job = _sagemaker_client().describe_processing_job(
+            ProcessingJobName=processing_job_name
+        )
+        return processing_job
+    except BaseException:
+        logging.error(
+            f"SageMaker could not find a processing job with the name {processing_job_name}"
+        )
+        return None
 
 @service_marker
 @pytest.mark.canary
 class TestProcessingJob:
-    def _get_created_processing_job_status_list(self):
-        return ["InProgress", "Completed"]
-
-    def _get_stopped_processing_job_status_list(self):
-        return ["Stopped", "Stopping"]
-
-    def _get_sagemaker_processing_job_arn(
-        self, sagemaker_client, processing_job_name: str
-    ):
-        try:
-            processing_job = sagemaker_client.describe_processing_job(
-                ProcessingJobName=processing_job_name
-            )
-            return processing_job["ProcessingJobArn"]
-        except BaseException:
-            logging.error(
-                f"SageMaker could not find a processing job with the name {processing_job_name}"
-            )
-            return None
-
-    def _get_sagemaker_processing_job_status(
-        self, sagemaker_client, processing_job_name: str
-    ):
-        try:
-            processing_job = sagemaker_client.describe_processing_job(
-                ProcessingJobName=processing_job_name
-            )
-            return processing_job["ProcessingJobStatus"]
-        except BaseException:
-            logging.error(
-                f"SageMaker could not find a processing job with the name {processing_job_name}"
-            )
-            return None
-
-    def test_create_processing_job(self, kmeans_processing_job):
+    def test_processing_job(self, kmeans_processing_job):
         (reference, resource) = kmeans_processing_job
         assert k8s.get_resource_exists(reference)
 
-    def test_processing_job_has_correct_arn(
-        self, sagemaker_client, kmeans_processing_job
-    ):
-        (reference, _) = kmeans_processing_job
-        resource = k8s.get_resource(reference)
         processing_job_name = resource["spec"].get("processingJobName", None)
-
         assert processing_job_name is not None
 
-        resource_processing_job_arn = k8s.get_resource_arn(resource)
-        expected_processing_job_arn = self._get_sagemaker_processing_job_arn(
-            sagemaker_client, processing_job_name
-        )
+        processing_job_desc = get_sagemaker_processing_job(processing_job_name)
 
-        assert resource_processing_job_arn == expected_processing_job_arn
-
-    def test_processing_job_has_created_status(
-        self, sagemaker_client, kmeans_processing_job
-    ):
-        (reference, _) = kmeans_processing_job
-        resource = k8s.get_resource(reference)
-        processing_job_name = resource["spec"].get("processingJobName", None)
-
-        assert processing_job_name is not None
-
-        current_processing_job_status = self._get_sagemaker_processing_job_status(
-            sagemaker_client, processing_job_name
-        )
-        expected_processing_job_status_list = (
-            self._get_created_processing_job_status_list()
-        )
-        assert current_processing_job_status in expected_processing_job_status_list
-
-    def test_processing_job_has_stopped_status(
-        self, sagemaker_client, kmeans_processing_job
-    ):
-        (reference, _) = kmeans_processing_job
-        resource = k8s.get_resource(reference)
-        processing_job_name = resource["spec"].get("processingJobName", None)
-
-        assert processing_job_name is not None
+        assert k8s.get_resource_arn(resource) == processing_job_desc["ProcessingJobArn"]
+        assert processing_job_desc["ProcessingJobStatus"] in PROCESSING_JOB_STATUS_CREATED
 
         # Delete the k8s resource.
         _, deleted = k8s.delete_custom_resource(reference)
         assert deleted is True
 
-        current_processing_job_status = self._get_sagemaker_processing_job_status(
-            sagemaker_client, processing_job_name
-        )
-        expected_processing_job_status_list = (
-            self._get_stopped_processing_job_status_list()
-        )
-        assert current_processing_job_status in expected_processing_job_status_list
+        processing_job_desc = get_sagemaker_processing_job(processing_job_name)
+        assert processing_job_desc["ProcessingJobStatus"] in PROCESSING_JOB_STATUS_STOPPED

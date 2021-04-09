@@ -24,7 +24,7 @@ from sagemaker.replacement_values import REPLACEMENT_VALUES
 from common.resources import load_resource_file, random_suffix_name
 from common import k8s
 
-RESOURCE_PLURAL = 'hyperparametertuningjobs'
+RESOURCE_PLURAL = "hyperparametertuningjobs"
 HPO_JOB_STATUS_CREATED = ("InProgress", "Completed")
 HPO_JOB_STATUS_STOPPED = ("Stopped", "Stopping")
 
@@ -74,7 +74,7 @@ def get_sagemaker_hpo_job(hpo_job_name: str):
 @service_marker
 @pytest.mark.canary
 class TestHPO:
-    def test_create_hpo(self, xgboost_hpojob):
+    def test_hpo(self, xgboost_hpojob):
         (reference, resource) = xgboost_hpojob
         assert k8s.get_resource_exists(reference)
     
